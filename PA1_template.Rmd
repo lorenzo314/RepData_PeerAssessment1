@@ -1,25 +1,185 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
+output:
   html_document:
     keep_md: true
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+#### Read the data
 
+```{r echo=TRUE}
+datafile = 'activity.csv'
+d<-read.csv(datafile, header = TRUE)
+```
 
+#### Make an histogram of the total number of steps per date
+#### Missing values are excluded
 
-## What is mean total number of steps taken per day?
+```{r echo=TRUE}
+t<-tapply(d$steps, d$date, sum, na.rm=TRUE)
+hist(t, breaks = 20, freq = TRUE,
+     main='Histogram of total number of steps per day',
+     xlab='Total number of steps per day',
+     ylab='Count')
+```
 
+#### Print mean and median of total number of steps per day
+#### Missing values are excluded
+```{r echo=TRUE}
+print(paste('Mean number of steps per day',
+            mean(d$steps, na.rm = TRUE)))
+print(paste('Median number of steps per day',
+            median(d$steps, na.rm = TRUE)))
+```
 
+#### Print the graph of the mean number of steps in each time interval
+#### Missing values are excluded
+```{r echo=TRUE}
+t<-tapply(d$steps, d$interval, mean, na.rm=TRUE)
+plot(unique(d$interval), t, type="l",xlab='Interval',
+     ylab='Mean number of steps',
+     main='Mean number of steps in each interval')
+```
 
-## What is the average daily activity pattern?
-
-
+#### Find the interval that contains the maximum number of steps on average across all days
+#### Missing values are excluded
+```{r echo=TRUE}
+print(t[t==max(t)])
+```
 
 ## Imputing missing values
 
+#### How many missing values are there?
+```{r echo=TRUE}
+print(paste("Number of missing values",
+            length(d$steps[is.na(d$steps)==TRUE])))
+```
+
+#### As missing values use the mean number of steps in each interval
+```{r echo=TRUE}
+steps<-d$steps
+date<-d$date
+interval<-d$interval
+u<-which(is.na(d$steps))
+steps[u]<-t[as.character(d$interval[u])]
+new_d<-data.frame(steps, date, interval)
+```
+
+#### Check that there are indeed no more missing values in the steps column
+```{r echo=TRUE}
+a<-is.na(new_d$steps)==TRUE
+a[a==TRUE]
+```
+
+#### Make an histogram of the total number of steps per date
+#### Missing values are imputed as decribed above
+
+```{r echo=TRUE}
+t<-tapply(new_d$steps, new_d$date, sum, na.rm=TRUE)
+hist(t, breaks = 20, freq = TRUE,
+     main='Histogram of total number of steps per day with imputed missing values',
+     xlab='Total number of steps per day',
+     ylab='Count')
+```
+
+#### Imputing the missing values does make a difference: as shown below: the missing values are imputed so the large bar at 0 gets replaced by a bump of the histogram at ~10000 
+
+```{r fig.show = 'hide'}
+t<-tapply(new_d$steps, new_d$date, sum, na.rm=TRUE)
+p1<-hist(t, breaks = 20, freq = TRUE)
+t<-tapply(d$steps, d$date, sum, na.rm=TRUE)
+p2<-hist(t, breaks = 20, freq = TRUE)
+```
+```{r echo=TRUE}
+plot(p1, col=rgb(0,0,1,1/4),
+     main='Showing both histograms',
+     xlab='Total number of steps per day',
+     ylab='Count') # first histogram
+plot(p2, col=rgb(1,0,0,1/4), add=T)  # second
+```
+
+#### Let us try to better understand this
+
+```{r echo=TRUE}
+length(unique(d$date[u]))
+length(unique(d$interval[u]))
+length(u)
+length(unique(d$interval[u]))*length(unique(d$date[u]))
+sum(new_d$steps[1:length(unique(d$interval))])
+```
+
+#### The code above shows that:
+#### 1. There are 8 days with missing values
+#### 2. There are 288 intervals per day
+#### 3. There are 2304 missing values
+#### 4. 288*8 = 2304
+
+#### So all missing values occur in just 8 days which have no valid values at all
+
+#### If a day does not have any value all its 288 interval are filled with the corresponding mean values, which gives a total number of imputed steps 10766.19; this happens for 8 days and explains the bump at ~10000 steps in the second histogram (from 10 to 18 cases) and the corresponding disappearance (from 10 to 2) of the 8 missing values cases at ~0
+
+#### Find the levels given by the function weekdays
+```{r echo=TRUE}
+fwd<-factor(weekdays(as.POSIXct(d$date)))
+lv<-levels(fwd)
+print(lv)
+```
+
+#### Create the appropriate levels: weekday and weekend
+```{r echo=TRUE}
+lv<-c("weekday","weekday","weekend","weekend","weekday",
+      "weekday","weekday")
+fwd2<-factor(weekdays(as.POSIXct(d$date)),labels=lv)
+```
+
+#### Separate dataset into weekdays and weekends
+#### Use the data with the missing values imputed
+```{r echo=TRUE}
+q<-fwd2=='weekday'
+steps<-new_d$steps[q==TRUE]
+date<-new_d$date[q==TRUE]
+interval<-new_d$interval[q==TRUE]
+new_d_weekday<-data.frame(steps, date, interval)
+steps<-new_d$steps[q==FALSE]
+date<-new_d$date[q==FALSE]
+interval<-new_d$interval[q==FALSE]
+new_d_weekend<-data.frame(steps, date, interval)
+```
+
+#### Save default plotting option and set plotting
+#### options to 2x1 graphs
+```{r echo=TRUE}
+old.par <- par(mar = c(0, 0, 0, 0))
+par(mfrow=c(2,1))
+```
+
+#### Plot mean number of steps during each interval
+#### for weekdays and weekend separately
+```{r echo=TRUE}
+t<-tapply(new_d_weekday$steps, new_d_weekday$interval, mean, na.rm=TRUE)
+plot(unique(new_d_weekday$interval), t, type="l",xlab='Interval',
+     ylab='Mean number of steps',
+     main='Mean number of steps in each interval, weekdays',
+     ylim=c(0,230))
+t<-tapply(new_d_weekend$steps, new_d_weekend$interval, mean, na.rm=TRUE)
+plot(unique(new_d_weekend$interval), t, type="l",xlab='Interval',
+     ylab='Mean number of steps',
+     main='Mean number of steps in each interval, weekends',
+     ylim=c(0,230))
+```
+
+#### The plots show that there is a difference in activity patterns between
+#### weekdays and weekends: on weekends the subject is more acvtive during
+#### the day, especially later in the day, and gets up later and goes to bed later
+
+#### Restore default plotting options
+```{r echo = TRUE}
+par(old.par)
+```
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+
